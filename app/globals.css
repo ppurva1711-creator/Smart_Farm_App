@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Smart Farm Color Palette */
+  --background: #F4F8F4;
+  --foreground: #263238;
+  --card: #FFFFFF;
+  --card-foreground: #263238;
+  --popover: #FFFFFF;
+  --popover-foreground: #263238;
+  --primary: #2E7D32;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F8F4;
+  --secondary-foreground: #263238;
+  --muted: #E8EFE8;
+  --muted-foreground: #90A4AE;
+  --accent: #1565C0;
+  --accent-foreground: #FFFFFF;
+  --destructive: #E53935;
+  --destructive-foreground: #FFFFFF;
+  --border: #E8EFE8;
+  --input: #FFFFFF;
+  --ring: #2E7D32;
+  --chart-1: #2E7D32;
+  --chart-2: #1565C0;
+  --chart-3: #E53935;
+  --chart-4: #558B2F;
+  --chart-5: #1976D2;
+  --radius: 1rem;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #263238;
+  --sidebar-primary: #2E7D32;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1565C0;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #E8EFE8;
+  --sidebar-ring: #2E7D32;
+}
+
+.dark {
+  --background: #1A2D1A;
+  --foreground: #F4F8F4;
+  --card: #263238;
+  --card-foreground: #F4F8F4;
+  --popover: #263238;
+  --popover-foreground: #F4F8F4;
+  --primary: #4CAF50;
+  --primary-foreground: #1A2D1A;
+  --secondary: #263238;
+  --secondary-foreground: #F4F8F4;
+  --muted: #37474F;
+  --muted-foreground: #B0BEC5;
+  --accent: #42A5F5;
+  --accent-foreground: #1A2D1A;
+  --destructive: #EF5350;
+  --destructive-foreground: #1A2D1A;
+  --border: #37474F;
+  --input: #263238;
+  --ring: #4CAF50;
+  --chart-1: #4CAF50;
+  --chart-2: #42A5F5;
+  --chart-3: #EF5350;
+  --chart-4: #7CB342;
+  --chart-5: #64B5F6;
+  --sidebar: #263238;
+  --sidebar-foreground: #F4F8F4;
+  --sidebar-primary: #4CAF50;
+  --sidebar-primary-foreground: #1A2D1A;
+  --sidebar-accent: #42A5F5;
+  --sidebar-accent-foreground: #1A2D1A;
+  --sidebar-border: #37474F;
+  --sidebar-ring: #4CAF50;
+}
+
+@theme inline {
+  --font-sans: 'Poppins', 'Poppins Fallback';
+  --font-mono: 'Poppins', 'Poppins Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
