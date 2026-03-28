@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "../../../lib/firebase";
+import { getAdminDb } from "../../../lib/firebase-admin";
 import { validateHardwareSecret, verifyUserToken, unauthorizedResponse }
   from "../../../middleware/hardware-auth";
 import type { HardwareValveConfirmPayload } from "../../../types";

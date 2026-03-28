@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Globe, Check } from 'lucide-react';
 import { languages, Language } from '@/lib/i18n';
-import { useLanguage } from '@/context/language-context';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 export function LanguageSelector() {
   const { language, setLanguage } = useLanguage();

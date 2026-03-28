@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "../../../lib/firebase";
+import { getAdminDb } from "../../../lib/firebase-admin";
 import { validateHardwareSecret } from "../../../middleware/hardware-auth";
 import type { HardwareSensorPayload, BatteryChargeCycle } from "../../../types";
 

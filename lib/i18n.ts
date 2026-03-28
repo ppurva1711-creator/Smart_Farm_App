@@ -1,9 +1,10 @@
-export type Language = 'en' | 'hi' | 'mr' | 'ta' | 'te';
+export type Language = 'en' | 'hi' | 'mr' | 'pa' | 'ta' | 'te';
 
 export const languages: Record<Language, { name: string; nativeName: string }> = {
   en: { name: 'English', nativeName: 'English' },
   hi: { name: 'Hindi', nativeName: 'हिंदी' },
   mr: { name: 'Marathi', nativeName: 'मराठी' },
+  pa: { name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ' },
   ta: { name: 'Tamil', nativeName: 'தமிழ்' },
   te: { name: 'Telugu', nativeName: 'తెలుగు' },
 };
@@ -87,6 +88,29 @@ export const translations: Record<Language, Record<string, string>> = {
     'language': 'भाषा',
     'select_language': 'भाषा निवडा',
   },
+  pa: {
+  'welcome': 'ਜੀ ਆਇਆਂ ਨੂੰ',
+  'smart_farm_control': 'ਸਮਾਰਟ ਫਾਰਮ ਕੰਟਰੋਲ ਸਿਸਟਮ',
+  'temperature': 'ਤਾਪਮਾਨ',
+  'humidity': 'ਨਮੀ',
+  'dashboard': 'ਡੈਸ਼ਬੋਰਡ',
+  'valves': 'ਵਾਲਵ',
+  'alerts': 'ਸੁਚੇਤਨਾ',
+  'battery': 'ਬੈਟਰੀ',
+  'help': 'ਮਦਦ',
+  'language': 'ਭਾਸ਼ਾ',
+  'select_language': 'ਭਾਸ਼ਾ ਚੁਣੋ',
+  'soil_moisture': 'ਮਿੱਟੀ ਦੀ ਨਮੀ',
+  'water_flow': 'ਪਾਣੀ ਦਾ ਵਹਾਅ',
+  'dry': 'ਸੁੱਕਾ', 'high': 'ਉੱਚਾ', 'normal': 'ਸਾਧਾਰਨ', 'low': 'ਘੱਟ',
+  'active': 'ਸਕਿਰਿਆ',
+  'power_cut_alert': 'ਬਿਜਲੀ ਕੱਟ ਅਲਰਟ',
+  'currently_experiencing_power_cut': 'ਹੁਣ ਬਿਜਲੀ ਕੱਟ ਹੋ ਰਿਹਾ ਹੈ',
+  'ambient_temperature': 'ਵਾਤਾਵਰਨ ਤਾਪਮਾਨ',
+  'relative_humidity': 'ਸਾਪੇਖ ਨਮੀ',
+  'current_flow_rate': 'ਮੌਜੂਦਾ ਵਹਾਅ ਦਰ',
+  'real_time_sensors': 'ਰੀਅਲ-ਟਾਈਮ ਸੈਂਸਰ',
+},
   ta: {
     'welcome': 'வரவேற்கிறோம்',
     'smart_farm_control': 'ஸ்மார்ட் ஃபார்ம் கட்டுப்பாட்டு அமைப்பு',

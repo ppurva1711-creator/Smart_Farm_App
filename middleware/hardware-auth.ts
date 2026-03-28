@@ -50,7 +50,7 @@ export async function verifyUserToken(req: NextRequest): Promise<string | null> 
 
   const token = authHeader.slice(7);
   try {
-    const { getAdminAuth } = await import("../lib/firebase");
+    const { getAdminAuth } = await import("../lib/firebase-admin");
     const decoded = await getAdminAuth().verifyIdToken(token);
     return decoded.uid;
   } catch {

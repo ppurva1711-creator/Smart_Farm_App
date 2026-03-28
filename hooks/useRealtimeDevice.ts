@@ -6,8 +6,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { ref, onValue, off, DatabaseReference } from "firebase/database";
-import { getClientDb } from "../lib/firebase";
-import type { SensorData, ValveState, DailyWaterSummary, BatteryHealth, LocationData } from "../types";
+import { getClientDb } from "@/lib/firebase";
+import { SensorData, ValveState, DailyWaterSummary, BatteryHealth, LocationData } from "@/types";
 
 interface RealtimeDeviceData {
   sensors:    SensorData | null;

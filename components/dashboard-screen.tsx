@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Droplet, Thermometer, Wind, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useLanguage } from '@/context/language-context';
+import { useLanguage } from '@/app/context/LanguageContext';
 import { t } from '@/lib/i18n';
 import { LanguageSelector } from './language-selector';
 

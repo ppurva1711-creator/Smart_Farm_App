@@ -105,7 +105,7 @@ export function LoginScreen({ onLoginSuccess }: { onLoginSuccess: () => void }) 
                   placeholder="000000"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.slice(0, 6))}
-                  maxLength="6"
+                  maxLength={6}
                   className="w-full bg-[#F4F8F4] rounded-2xl px-4 py-3 text-center text-2xl tracking-widest font-semibold text-[#263238] outline-none"
                 />
               </div>

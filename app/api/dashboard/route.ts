@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "../../../lib/firebase";
+import { getAdminDb } from "../../../lib/firebase-admin";
 import { verifyUserToken, unauthorizedResponse } from "../../../middleware/hardware-auth";
 import type { BatteryHealth } from "../../../types";
 
