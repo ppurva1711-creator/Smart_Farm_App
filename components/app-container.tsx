@@ -1,56 +1,74 @@
 "use client";
-// components/app-container.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Main app shell — handles splash → login → app flow
-// Now integrated with Android bridge for native features
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../app/context/LanguageContext';
 import type { Language } from '../app/context/LanguageContext';
+import { getClientAuthInstance, getClientDb } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { ref, get } from 'firebase/database';
 import { SplashScreen }       from './splash-screen';
 import { LoginScreen }        from './login-screen';
 import { DashboardScreen }    from './dashboard-screen';
 import { ValveControlScreen } from './valve-control-screen';
-import { BatteryScreen }      from './battery-screen';
 import { AlertsScreen }       from './alerts-screen';
 import ChatbotHelpScreen      from './chatbot-help-screen';
 import { BottomNavigation }   from './bottom-navigation';
-import { useAndroidBridge }   from '../hooks/useAndroidBridge';
 
-type AppState  = 'splash' | 'login' | 'app';
+type AppState  = 'loading' | 'splash' | 'login' | 'app';
 type ActiveTab = 'dashboard' | 'valves' | 'alerts' | 'help';
 
 function AppContainerContent() {
-  const [appState,   setAppState]   = useState<AppState>('splash');
-  const [activeTab,  setActiveTab]  = useState<ActiveTab>('dashboard');
-  const { setLanguage }             = useLanguage();
-  const bridge                      = useAndroidBridge();
+  const [appState,  setAppState]  = useState<AppState>('loading');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const { setLanguage } = useLanguage();
 
-  // ── On mount: detect Android language + restore login state ──────────────
   useEffect(() => {
-    // Auto-set language from Android device language
-    if (bridge.isAndroid) {
-      const deviceLang = bridge.getDeviceLanguage() as Language;
-      const saved      = localStorage.getItem("sf_language") as Language | null;
-      if (!saved) setLanguage(deviceLang);
-    }
+    // Check saved language
+    const savedLang = localStorage.getItem("sf_language") as Language | null;
+    if (savedLang) setLanguage(savedLang);
 
-    // Check if user is already logged in
-    const uid      = localStorage.getItem("sf_uid");
-    const deviceId = localStorage.getItem("sf_device_id")
-                  || bridge.getAndroidDeviceId();
+    // Check if user already logged in via Firebase Auth
+    const auth = getClientAuthInstance();
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        localStorage.setItem("sf_uid", user.uid);
+        // Check if device is linked
+        const db       = getClientDb();
+        const devSnap  = await get(ref(db, `users/${user.uid}/devices`));
+        if (devSnap.exists()) {
+          const deviceId = Object.keys(devSnap.val())[0];
+          localStorage.setItem("sf_device_id", deviceId);
+        }
+        setAppState('app');
+      } else {
+        // Check localStorage as fallback
+        const uid = localStorage.getItem("sf_uid");
+        if (uid) {
+          setAppState('app');
+        } else {
+          setAppState('splash');
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
 
-    if (uid && deviceId) {
-      // Returning user — skip splash and login
-      setAppState('app');
-    }
-  }, [bridge.isAndroid]);
+  if (appState === 'loading') {
+    return (
+      <div className="min-h-screen bg-green-700 flex flex-col items-center justify-center">
+        <div className="text-6xl mb-4 animate-pulse">🌾</div>
+        <p className="text-white font-medium text-lg">Smart Farm</p>
+      </div>
+    );
+  }
 
-  const handleSplashComplete = () => setAppState('login');
-  const handleLoginSuccess   = () => setAppState('app');
+  if (appState === 'splash') {
+    return <SplashScreen onComplete={() => setAppState('login')} />;
+  }
 
-  // ── Render active tab ─────────────────────────────────────────────────────
+  if (appState === 'login') {
+    return <LoginScreen onLoginSuccess={() => setAppState('app')} />;
+  }
+
   const renderTab = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardScreen />;
@@ -60,14 +78,6 @@ function AppContainerContent() {
       default:          return <DashboardScreen />;
     }
   };
-
-  if (appState === 'splash') {
-    return <SplashScreen onComplete={handleSplashComplete} />;
-  }
-
-  if (appState === 'login') {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
-  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">

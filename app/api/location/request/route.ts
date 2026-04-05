@@ -8,8 +8,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "../../../lib/firebase";
-import { verifyUserToken, unauthorizedResponse } from "../../../middleware/hardware-auth";
+import { getAdminDb } from "@/lib/firebase-admin";
+import { verifyUserToken, unauthorizedResponse } from "../../../../middleware/hardware-auth";
 
 // ── Twilio client (lazy import so server-only) ────────────────────────────────
 async function getTwilio() {

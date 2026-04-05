@@ -1,8 +1,5 @@
 // middleware/hardware-auth.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Validates every request coming from the SIM800L hardware using a shared
-// secret defined in .env. Prevents rogue devices pushing fake sensor data.
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
@@ -12,7 +9,6 @@ const HARDWARE_SECRET = process.env.HARDWARE_SHARED_SECRET || "";
 /**
  * Validates the `secret` field in a hardware payload.
  * The hardware computes: HMAC-SHA256(deviceId + timestamp, HARDWARE_SHARED_SECRET)
- * and sends it as `secret`.
  */
 export function validateHardwareSecret(
   deviceId: string,
@@ -24,7 +20,7 @@ export function validateHardwareSecret(
     return true;
   }
 
-  // Reject payloads older than 5 minutes (replay attack protection)
+  // Reject payloads older than 5 minutes
   const ageMs = Date.now() - timestamp;
   if (ageMs > 5 * 60 * 1000 || ageMs < -60_000) {
     return false;
@@ -35,14 +31,27 @@ export function validateHardwareSecret(
     .update(`${deviceId}${timestamp}`)
     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(expected, "hex"),
-    Buffer.from(providedSecret, "hex")
-  );
+  // ✅ FIX STARTS HERE
+  const expectedBuffer = Buffer.from(expected, "hex");
+  let providedBuffer: Buffer;
+
+  try {
+    providedBuffer = Buffer.from(providedSecret, "hex");
+  } catch {
+    return false; // invalid hex input
+  }
+
+  // Prevent crash in timingSafeEqual
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+  // ✅ FIX ENDS HERE
 }
 
 /**
- * For client API routes – verifies Firebase ID token from Authorization header.
+ * Verifies Firebase ID token from Authorization header.
  */
 export async function verifyUserToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("Authorization");
