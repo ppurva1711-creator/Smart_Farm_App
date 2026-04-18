@@ -12,6 +12,13 @@ export interface ValveState {
   flowRateLPM: number;        // litres per minute (set during setup)
 }
 
+export interface MotorState {
+  desiredState: boolean;
+  hardwareState: boolean | null;
+  desiredAt: number | null;
+  lastConfirmed: number | null;
+}
+
 export interface SensorData {
   temperature: number;        // °C
   humidity?: number;          // % (if sensor available)
@@ -85,6 +92,7 @@ export interface HardwareSensorPayload {
   battery: number;
   batteryVoltage: number;
   valveStates: Record<string, boolean>; // { valve1: true, valve2: false … }
+  motorState?: boolean; 
   location?: string;                    // "lat,lng" optional
   secret: string;                       // shared HMAC secret
 }

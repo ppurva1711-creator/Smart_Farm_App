@@ -145,6 +145,15 @@ export function LoginScreen({ onLoginSuccess }: { onLoginSuccess: () => void }) 
           valve4: { desiredState:false, hardwareState:false, label:"West Field",  flowRateLPM:10 },
         });
       }
+
+      const motorSnap = await get(ref(db, `devices/${deviceId}/motor`));
+      if (!motorSnap.exists()) {
+        await set(ref(db, `devices/${deviceId}/motor`), {
+          desiredState: false,
+          hardwareState: false,
+          lastConfirmed: null,
+        });
+      }
       localStorage.setItem("sf_device_id", deviceId);
       onLoginSuccess();
     } catch { setError("Failed to connect device"); }

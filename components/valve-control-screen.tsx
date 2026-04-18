@@ -1,151 +1,164 @@
 "use client";
+// components/valve-control-screen.tsx
+// Adapted for 1-pump system (your relay on D1)
 import { useState, useEffect, useCallback } from 'react';
-import { Droplet, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { Droplet, Clock, Wifi, WifiOff, Power } from 'lucide-react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import type { Language } from '@/app/context/LanguageContext';
 import { getClientDb } from '@/lib/firebase';
-import { ref, onValue, off, update, get } from 'firebase/database';
+import { ref, onValue, off, update, get, set } from 'firebase/database';
+import { Switch } from './ui/switch';
 
 const T: Record<string, Record<Language, string>> = {
-  title:      { en:"Valve Control",    hi:"वाल्व नियंत्रण", mr:"झडप नियंत्रण",   pa:"ਵਾਲਵ ਕੰਟਰੋਲ",   te:"వాల్వ్ నియంత్రణ",  ta:"வால்வு கட்டுப்பாடு" },
-  subtitle:   { en:"Irrigation",       hi:"सिंचाई",         mr:"सिंचन",           pa:"ਸਿੰਚਾਈ",         te:"నీటిపారుదల",        ta:"நீர்ப்பாசனம்" },
-  valve:      { en:"Valve",            hi:"वाल्व",          mr:"झडप",             pa:"ਵਾਲਵ",           te:"వాల్వ్",            ta:"வால்வு" },
-  open:       { en:"OPEN",             hi:"खुला",           mr:"उघडे",            pa:"ਖੁੱਲ੍ਹਾ",         te:"తెరిచి",            ta:"திறந்த" },
-  closed:     { en:"CLOSED",           hi:"बंद",            mr:"बंद",             pa:"ਬੰਦ",             te:"మూసివున్న",          ta:"மூடிய" },
-  lastActive: { en:"Last active",      hi:"अंतिम सक्रिय",   mr:"शेवटचे सक्रिय",  pa:"ਆਖਰੀ ਸਕਿਰਿਆ",   te:"చివరగా",            ta:"கடைசியாக" },
-  turnAllOn:  { en:"Turn All ON",      hi:"सभी खोलें",      mr:"सर्व उघडा",       pa:"ਸਾਰੇ ਖੋਲ੍ਹੋ",    te:"అన్నీ తెరవు",       ta:"அனைத்தும் திற" },
-  turnAllOff: { en:"Turn All OFF",     hi:"सभी बंद करें",   mr:"सर्व बंद करा",   pa:"ਸਾਰੇ ਬੰਦ ਕਰੋ",   te:"అన్నీ మూయి",        ta:"அனைத்தும் மூடு" },
-  confirmed:  { en:"✓ Confirmed",      hi:"✓ पुष्टि",       mr:"✓ पुष्टी",        pa:"✓ ਪੁਸ਼ਟੀ",        te:"✓ నిర్ధారణ",        ta:"✓ உறுதி" },
-  pending:    { en:"⏳ Sending...",     hi:"⏳ भेज रहे...",  mr:"⏳ पाठवत आहे...", pa:"⏳ ਭੇਜਿਆ ਜਾ...", te:"⏳ పంపుతోంది...",   ta:"⏳ அனுப்புகிறது..." },
-  noDevice:   { en:"No device linked", hi:"डिवाइस नहीं",   mr:"डिव्हाइस नाही",  pa:"ਕੋਈ ਡਿਵਾਈਸ ਨਹੀਂ",te:"పరికరం లేదు",       ta:"சாதனம் இல்லை" },
-  now:        { en:"just now",         hi:"अभी",            mr:"आत्ता",           pa:"ਹੁਣੇ",            te:"ఇప్పుడే",           ta:"இப்போதே" },
+ title:      { en:"Pump Control",      hi:"पंप नियंत्रण",    mr:"पंप नियंत्रण",   pa:"ਪੰਪ ਕੰਟਰੋਲ",     te:"పంప్ నియంత్రణ",    ta:"பம்ப் கட்டுப்பாடு" },
+  subtitle:   { en:"Irrigation pump",   hi:"सिंचाई पंप",      mr:"सिंचन पंप",      pa:"ਸਿੰਚਾਈ ਪੰਪ",      te:"నీటిపారుదల పంప్",  ta:"நீர்ப்பாசன பம்ப்" },
+  motorTitle: { en:"Water Pump Motor",  hi:"पानी मोटर",       mr:"पाणी मोटर",      pa:"ਪਾਣੀ ਮੋਟਰ",       te:"నీటి మోటార్",      ta:"நீர் மோட்டார்" },
+  motorOn:    { en:"MOTOR ON",          hi:"मोटर चालू",       mr:"मोटर सुरू",      pa:"ਮੋਟਰ ਚਾਲੂ",       te:"మోటార్ ఆన్",       ta:"மோட்டார் ஆன்" },
+  motorOff:   { en:"MOTOR OFF",         hi:"मोटर बंद",        mr:"मोटर बंद",       pa:"ਮੋਟਰ ਬੰਦ",        te:"మోటార్ ఆఫ్",      ta:"மோட்டார் ஆஃப்" },
+  pump:       { en:"Water Pump",        hi:"पानी का पंप",     mr:"पाण्याचा पंप",   pa:"ਪਾਣੀ ਦਾ ਪੰਪ",     te:"నీటి పంప్",        ta:"நீர் பம்ப்" },
+  on:         { en:"RUNNING 💧",        hi:"चालू 💧",         mr:"चालू 💧",        pa:"ਚਾਲੂ 💧",         te:"నడుస్తోంది 💧",    ta:"இயங்குகிறது 💧" },
+  off:        { en:"STOPPED",           hi:"बंद",             mr:"बंद",            pa:"ਬੰਦ",             te:"ఆగింది",           ta:"நிறுத்தப்பட்டது" },
+  turnOn:     { en:"START Pump",        hi:"पंप शुरू करें",   mr:"पंप सुरू करा",   pa:"ਪੰਪ ਸ਼ੁਰੂ ਕਰੋ",    te:"పంప్ ప్రారంభించు",  ta:"பம்ப் தொடங்கு" },
+  turnOff:    { en:"STOP Pump",         hi:"पंप बंद करें",    mr:"पंप बंद करा",    pa:"ਪੰਪ ਬੰਦ ਕਰੋ",     te:"పంప్ ఆపు",         ta:"பம்ப் நிறுத்து" },
+  waiting:    { en:"⏳ Sending...",      hi:"⏳ भेज रहे...",   mr:"⏳ पाठवत...",    pa:"⏳ ਭੇਜ...",        te:"⏳ పంపుతోంది...",   ta:"⏳ அனுப்புகிறது..." },
+  confirmed:  { en:"✓ Hardware confirmed", hi:"✓ हार्डवेयर पुष्टि", mr:"✓ पुष्टी", pa:"✓ ਪੁਸ਼ਟੀ", te:"✓ నిర్ధారించబడింది", ta:"✓ உறுதிப்படுத்தல்" },
+  lastRun:    { en:"Last run",          hi:"आखिरी बार",       mr:"शेवटचे",         pa:"ਆਖਰੀ ਵਾਰ",       te:"చివరి సారి",       ta:"கடைசி நேரம்" },
+  noDevice:   { en:"No device linked",  hi:"डिवाइस नहीं",     mr:"डिव्हाइस नाही",  pa:"ਡਿਵਾਈਸ ਨਹੀਂ",     te:"పరికరం లేదు",      ta:"சாதனம் இல்லை" },
+  today:      { en:"Used today",        hi:"आज उपयोग",        mr:"आज वापर",        pa:"ਅੱਜ ਵਰਤੋਂ",       te:"నేడు వాడారు",      ta:"இன்று பயன்பாடு" },
 };
+function tl(key: string, lang: Language): string { return T[key]?.[lang] ?? T[key]?.en ?? key; }
 
-function tl(key: string, lang: Language): string {
-  return T[key]?.[lang] ?? T[key]?.en ?? key;
-}
-
-interface ValveData {
-  desiredState:  boolean;
+interface MotorData {
+  desiredState: boolean;
   hardwareState: boolean | null;
   lastConfirmed: number | null;
-  openedAt:      number | null;
-  label:         string;
-  flowRateLPM:   number;
 }
 
 export function ValveControlScreen() {
   const { language } = useLanguage();
   const deviceId = typeof window !== 'undefined' ? localStorage.getItem('sf_device_id') : null;
 
-  const [valves,    setValves]    = useState<Record<string, ValveData>>({});
+  const [pumpData,  setPumpData]  = useState<Record<string, unknown>>({});
   const [connected, setConnected] = useState(false);
-  const [toggling,  setToggling]  = useState<Record<string, boolean>>({});
-  const [error,     setError]     = useState("");
+  const [toggling,  setToggling]  = useState(false);
+  const [water,     setWater]     = useState({ totalLitres:0, tankCapacityLitres:2000 });
+  const [motor,     setMotor]     = useState<MotorData>({ desiredState: false, hardwareState: null, lastConfirmed: null });
+  const [motorBusy, setMotorBusy] = useState(false);
+  const [error, setError] = useState('')
 
-  // ── Real-time listener ──────────────────────────────────────
+  useEffect(() => {
+    if (!deviceId) return;
+    const db    = getClientDb();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const pRef = ref(db, `devices/${deviceId}/valves/valve1`);
+    onValue(pRef, snap => {
+      setPumpData(snap.val() ?? {});
+      setConnected(true);
+    }, () => setConnected(false));
+
+    const wRef = ref(db, `devices/${deviceId}/waterUsage/daily/${today}`);
+    onValue(wRef, snap => {
+      const d = snap.val();
+      if (d) setWater({ totalLitres:d.totalLitres??0, tankCapacityLitres:d.tankCapacityLitres??2000 });
+    });
+
+    return () => { off(pRef); off(wRef); };
+  }, [deviceId]);
+
+  // ── Real-time motor listener ─────────────────────────────────
   useEffect(() => {
     if (!deviceId) return;
     const db = getClientDb();
-    const r  = ref(db, `devices/${deviceId}/valves`);
+    const r  = ref(db, `devices/${deviceId}/motor`);
 
     onValue(r, async (snap) => {
       const data = snap.val();
       if (!data) {
-        // Create default 4 valves in Firebase
-        const defaults = {
-          valve1: { desiredState:false, hardwareState:null, lastConfirmed:null, openedAt:null, label:"North Field", flowRateLPM:10 },
-          valve2: { desiredState:false, hardwareState:null, lastConfirmed:null, openedAt:null, label:"South Field", flowRateLPM:10 },
-          valve3: { desiredState:false, hardwareState:null, lastConfirmed:null, openedAt:null, label:"East Field",  flowRateLPM:10 },
-          valve4: { desiredState:false, hardwareState:null, lastConfirmed:null, openedAt:null, label:"West Field",  flowRateLPM:10 },
-        };
-        await update(ref(db, `devices/${deviceId}/valves`), defaults);
-        setValves(defaults as Record<string, ValveData>);
+        const defaults = { desiredState: false, hardwareState: null, lastConfirmed: null };
+        await update(ref(db, `devices/${deviceId}/motor`), defaults);
+        setMotor(defaults);
       } else {
-        setValves(data);
+        setMotor({
+          desiredState: !!data.desiredState,
+          hardwareState: typeof data.hardwareState === "boolean" ? data.hardwareState : null,
+          lastConfirmed: data.lastConfirmed ?? null,
+        });
       }
-      setConnected(true);
-    }, (err) => {
-      setError("Firebase connection failed: " + err.message);
-      setConnected(false);
     });
 
     return () => off(r);
   }, [deviceId]);
 
-  // ── Toggle valve ─────────────────────────────────────────────
-  const handleToggle = useCallback(async (valveId: string, newState: boolean) => {
+  const handleMotorToggle = useCallback(async (newState: boolean) => {
     if (!deviceId) return;
-    setToggling(t => ({ ...t, [valveId]: true }));
+    setMotorBusy(true);
     setError("");
-
     try {
-      const db  = getClientDb();
+      await update(ref(getClientDb(), `devices/${deviceId}/motor`), {
+        desiredState: newState,
+        desiredAt: Date.now(),
+      });
+    } catch (e: unknown) {
+      setError("Failed to toggle motor: " + (e instanceof Error ? e.message : "Unknown error"));
+    } finally {
+      setTimeout(() => setMotorBusy(false), 600);
+    }
+  }, [deviceId]);
+
+
+  const isOn       = !!(pumpData.desiredState);
+  const isSynced   = pumpData.hardwareState === pumpData.desiredState;
+  const lastConfirmed = pumpData.lastConfirmed as number | null ?? null;
+
+  const handleToggle = async (newState: boolean) => {
+    if (!deviceId || toggling) return;
+    setToggling(true);
+    try {
+      const db = getClientDb();
       const now = Date.now();
 
-      // Write desired state — hardware picks this up within 5s
-      const updates: Record<string, unknown> = {
-        [`devices/${deviceId}/valves/${valveId}/desiredState`]: newState,
-        [`devices/${deviceId}/valves/${valveId}/desiredAt`]:    now,
-      };
+      await update(ref(db, `devices/${deviceId}/valves/valve1`), {
+        desiredState: newState,
+        desiredAt:    now,
+        label:        "Water Pump",
+        flowRateLPM:  10,
+        ...(newState ? { openedAt:now, closedAt:null } : { closedAt:now }),
+      });
 
-      if (newState) {
-        // Opening: record start time
-        updates[`devices/${deviceId}/valves/${valveId}/openedAt`]  = now;
-        updates[`devices/${deviceId}/valves/${valveId}/closedAt`]  = null;
-      } else {
-        // Closing: calculate water used
-        const valve   = valves[valveId];
-        const openedAt = valve?.openedAt;
-        if (openedAt) {
-          const durationMin  = (now - openedAt) / 60000;
-          const flowRate     = valve.flowRateLPM ?? 10;
-          const litres       = Math.round(durationMin * flowRate);
-          const dateKey      = new Date(now).toISOString().slice(0, 10);
-          updates[`devices/${deviceId}/valves/${valveId}/closedAt`]  = now;
-          updates[`devices/${deviceId}/valves/${valveId}/openedAt`]  = null;
-
-          // Update daily water summary
-          const summarySnap = await get(ref(db, `devices/${deviceId}/waterUsage/daily/${dateKey}`));
-          const summary     = summarySnap.val() ?? { totalLitres:0, byValve:{} };
-          const tankSnap    = await get(ref(db, `devices/${deviceId}/config/tankCapacityLitres`));
-          const tank        = tankSnap.val() ?? 2000;
-          const newTotal    = (summary.totalLitres ?? 0) + litres;
-
-          updates[`devices/${deviceId}/waterUsage/daily/${dateKey}/date`]               = dateKey;
-          updates[`devices/${deviceId}/waterUsage/daily/${dateKey}/totalLitres`]        = newTotal;
-          updates[`devices/${deviceId}/waterUsage/daily/${dateKey}/tankCapacityLitres`] = tank;
-          updates[`devices/${deviceId}/waterUsage/daily/${dateKey}/ratioPercent`]       = Math.min(100, Math.round((newTotal/tank)*100));
-          updates[`devices/${deviceId}/waterUsage/daily/${dateKey}/byValve/${valveId}`] = (summary.byValve?.[valveId] ?? 0) + litres;
-        }
+      // Water tracking when stopping
+      if (!newState && pumpData.openedAt) {
+        const openedAt    = pumpData.openedAt as number;
+        const durationMin = (now - openedAt) / 60000;
+        const litres      = Math.round(durationMin * 10);
+        const dateKey     = new Date(now).toISOString().slice(0, 10);
+        const sumRef      = ref(db, `devices/${deviceId}/waterUsage/daily/${dateKey}`);
+        const sumSnap     = await get(sumRef);
+        const sum         = sumSnap.val() ?? { totalLitres:0 };
+        const newTotal    = (sum.totalLitres ?? 0) + litres;
+        await set(sumRef, {
+          date:dateKey, totalLitres:newTotal, tankCapacityLitres:water.tankCapacityLitres,
+          ratioPercent:Math.min(100,Math.round((newTotal/water.tankCapacityLitres)*100)),
+          byValve:{ valve1:newTotal },
+        });
       }
-
-      await update(ref(db), updates);
-    } catch (e: unknown) {
-      setError("Failed to toggle valve: " + (e instanceof Error ? e.message : "Unknown error"));
-    } finally {
-      setTimeout(() => setToggling(t => ({ ...t, [valveId]: false })), 600);
-    }
-  }, [deviceId, valves]);
-
-  const handleAllOn  = () => Object.keys(valves).forEach(id => !valves[id].desiredState && handleToggle(id, true));
-  const handleAllOff = () => Object.keys(valves).forEach(id =>  valves[id].desiredState && handleToggle(id, false));
+    } catch (e) { console.error(e); }
+    finally { setTimeout(() => setToggling(false), 1000); }
+  };
 
   const formatTime = (ts: number | null) => {
-    if (!ts) return tl("now", language);
+    if (!ts) return "never";
     const m = Math.floor((Date.now() - ts) / 60000);
-    if (m < 1)  return tl("now", language);
-    if (m < 60) return `${m} min`;
-    return `${Math.floor(m/60)}h`;
+    if (m < 1)  return "just now";
+    if (m < 60) return `${m} min ago`;
+    return `${Math.floor(m/60)}h ago`;
   };
 
   if (!deviceId) {
     return (
       <div className="bg-[#F4F8F4] min-h-screen flex flex-col items-center justify-center p-6">
         <div className="text-6xl mb-4">📡</div>
-        <h2 className="text-xl font-bold text-gray-700 text-center mb-2">{tl("noDevice", language)}</h2>
-        <p className="text-gray-500 text-center text-sm">Please complete setup to link your hardware.</p>
+        <h2 className="text-xl font-bold text-gray-700 text-center">{tl("noDevice", language)}</h2>
       </div>
     );
   }
@@ -159,12 +172,7 @@ export function ValveControlScreen() {
             <h1 className="text-2xl font-bold">{tl("title", language)}</h1>
             <p className="text-white/80 text-sm mt-1">{tl("subtitle", language)}</p>
           </div>
-          <div className="flex items-center gap-2">
-            {connected
-              ? <Wifi className="w-5 h-5 text-green-300" />
-              : <WifiOff className="w-5 h-5 text-red-300" />
-            }
-          </div>
+          {connected ? <Wifi className="w-5 h-5 text-green-300" /> : <WifiOff className="w-5 h-5 text-red-300" />}
         </div>
       </div>
 
@@ -172,73 +180,119 @@ export function ValveControlScreen() {
         <div className="mx-4 mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
           {error}
         </div>
-      )}
+       )}
 
-      {/* Valves */}
       <div className="px-4 py-6 space-y-4">
-        {Object.keys(valves).length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center">
-            <RefreshCw className="w-8 h-8 text-gray-300 mx-auto mb-2 animate-spin" />
-            <p className="text-gray-400">Loading valves...</p>
-          </div>
-        ) : Object.entries(valves).map(([valveId, valve]) => {
-          const isOpen     = valve.desiredState;
-          const isSynced   = valve.hardwareState === valve.desiredState;
-          const isToggling = toggling[valveId];
-
-          return (
-            <div key={valveId}
-              className={`bg-white rounded-2xl p-4 shadow-sm transition-all ${isOpen ? 'border-2 border-[#2E7D32]' : 'border border-gray-100'}`}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`rounded-xl p-3 ${isOpen ? 'bg-[#E8F5E9]' : 'bg-[#EEEEEE]'}`}>
-                    <Droplet className={`w-6 h-6 ${isOpen ? 'text-[#2E7D32]' : 'text-[#90A4AE]'}`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#263238] text-base">
-                      {tl("valve", language)} {valveId.replace("valve", "")}
-                    </h3>
-                    <p className="text-sm text-[#90A4AE]">{valve.label}</p>
-                  </div>
-                </div>
-                <Switch
-                  checked={isOpen}
-                  disabled={isToggling}
-                  onCheckedChange={(checked) => handleToggle(valveId, checked)}
-                />
+   
+   /* Motor */
+        <div className="px-4 pt-6">
+        <div className={`bg-white rounded-2xl p-4 shadow-sm transition-all ${motor.desiredState ? 'border-2 border-[#2E7D32]' : 'border border-gray-100'}`}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-xl p-3 ${motor.desiredState ? 'bg-[#E8F5E9]' : 'bg-[#EEEEEE]'}`}>
+                <Power className={`w-6 h-6 ${motor.desiredState ? 'text-[#2E7D32]' : 'text-[#90A4AE]'}`} />
               </div>
-
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#E8EFE8]">
-                <div className={`w-2 h-2 rounded-full ${isOpen ? 'bg-[#2E7D32]' : 'bg-[#90A4AE]'}`} />
-                <span className={`text-sm font-medium ${isOpen ? 'text-[#2E7D32]' : 'text-[#90A4AE]'}`}>
-                  {isOpen ? tl("open", language) : tl("closed", language)}
-                </span>
-                <span className="ml-auto text-xs text-gray-400">
-                  {isToggling ? "..." : (valve.hardwareState !== null
-                    ? (isSynced ? tl("confirmed", language) : tl("pending", language))
-                    : tl("pending", language))}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 mt-2 text-xs text-[#90A4AE]">
-                <Clock className="w-4 h-4" />
-                <span>{tl("lastActive", language)}: {formatTime(valve.lastConfirmed)}</span>
+              <div>
+                <h3 className="font-semibold text-[#263238] text-base">{tl("motorTitle", language)}</h3>
+                <p className="text-sm text-[#90A4AE]">Pump relay control</p>
               </div>
             </div>
-          );
-        })}
-      </div>
+            <Switch
+              checked={motor.desiredState}
+              disabled={motorBusy}
+              onCheckedChange={handleMotorToggle}
+            />
+          </div>
 
-      {/* Quick actions */}
-      <div className="px-4 pb-24 pt-2 space-y-2">
-        <button onClick={handleAllOn}
-          className="w-full bg-[#2E7D32] text-white rounded-2xl py-3 font-semibold">
-          {tl("turnAllOn", language)}
-        </button>
-        <button onClick={handleAllOff}
-          className="w-full bg-white border-2 border-[#2E7D32] text-[#2E7D32] rounded-2xl py-3 font-semibold">
-          {tl("turnAllOff", language)}
-        </button>
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#E8EFE8]">
+            <div className={`w-2 h-2 rounded-full ${motor.desiredState ? 'bg-[#2E7D32]' : 'bg-[#90A4AE]'}`} />
+            <span className={`text-sm font-medium ${motor.desiredState ? 'text-[#2E7D32]' : 'text-[#90A4AE]'}`}>
+              {motor.desiredState ? tl("motorOn", language) : tl("motorOff", language)}
+            </span>
+            <span className="ml-auto text-xs text-gray-400">
+              {motorBusy ? "..." : (motor.hardwareState !== null
+                ? (motor.hardwareState === motor.desiredState ? tl("confirmed", language) : tl("pending", language))
+                : tl("pending", language))}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2 text-xs text-[#90A4AE]">
+            <Clock className="w-4 h-4" />
+            <span>{tl("lastActive", language)}: {formatTime(motor.lastConfirmed)}</span>
+          </div>
+        </div>
+      </div>
+        {/* Main pump card */}
+        <div className={`rounded-2xl p-6 shadow-sm border-2 transition-all ${isOn ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-100'}`}>
+          <div className="flex items-center gap-4 mb-6">
+            <div className={`rounded-2xl p-4 ${isOn ? 'bg-blue-100' : 'bg-gray-100'}`}>
+              <Power className={`w-10 h-10 ${isOn ? 'text-blue-600' : 'text-gray-400'}`} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-[#263238]">{tl("pump", language)}</h2>
+              <p className={`text-base font-semibold ${isOn ? 'text-blue-600' : 'text-gray-500'}`}>
+                {isOn ? tl("on", language) : tl("off", language)}
+              </p>
+            </div>
+            <div className={`w-5 h-5 rounded-full ${isOn ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'}`} />
+          </div>
+
+          {/* Big toggle buttons */}
+          <div className="flex gap-3 mb-4">
+            <button
+              onClick={() => handleToggle(true)}
+              disabled={isOn || toggling}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-2xl py-4 text-base transition-all shadow-sm">
+              ▶ {tl("turnOn", language)}
+            </button>
+            <button
+              onClick={() => handleToggle(false)}
+              disabled={!isOn || toggling}
+              className="flex-1 bg-red-500 hover:bg-red-600 active:bg-red-700 disabled:bg-gray-100 disabled:text-gray-300 text-white font-bold rounded-2xl py-4 text-base transition-all shadow-sm">
+              ■ {tl("turnOff", language)}
+            </button>
+          </div>
+
+          {/* Status */}
+          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {tl("lastRun", language)}: {formatTime(lastConfirmed)}
+            </span>
+            <span className="text-xs text-gray-500">
+              {toggling ? tl("waiting", language) : (pumpData.hardwareState !== null ? (isSynced ? tl("confirmed", language) : tl("waiting", language)) : tl("waiting", language))}
+            </span>
+          </div>
+        </div>
+
+        {/* Water used today */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="bg-[#E3F2FD] rounded-xl p-3"><Droplet className="w-6 h-6 text-[#1565C0]" /></div>
+            <p className="text-sm text-[#90A4AE]">{tl("today", language)}</p>
+          </div>
+          <p className="text-3xl font-bold text-[#263238]">{water.totalLitres} L</p>
+          <div className="w-full bg-[#E8EFE8] rounded-full h-2 mt-3">
+            <div className="bg-[#1565C0] h-2 rounded-full"
+              style={{ width:`${Math.min(100, Math.round((water.totalLitres/water.tankCapacityLitres)*100))}%` }} />
+          </div>
+          <p className="text-xs text-[#90A4AE] mt-1">
+            of {water.tankCapacityLitres}L tank capacity
+          </p>
+        </div>
+
+        {/* How pump responds to app */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <p className="text-amber-800 text-sm font-medium mb-2">ℹ️ How it works</p>
+          <ul className="text-amber-700 text-xs space-y-1">
+            <li>• Tap START/STOP above — command sent to Firebase</li>
+            <li>• Hardware reads Firebase every 5 seconds</li>
+            <li>• Relay on D1 (GPIO5) turns pump ON/OFF</li>
+            <li>• "✓ Confirmed" appears when hardware responds</li>
+            <li>• SMS "ON" / "OFF" also controls pump directly</li>
+          </ul>
+        </div>
+
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     battery?: number;
     batteryVoltage?: number;
     valveStates?: Record<string, boolean>;
+    motorState?: boolean;
     location?: string;
     secret: string;
   };
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { deviceId, temperature, humidity, soilMoisture,
-          battery, batteryVoltage, valveStates, location, secret } = body;
+          battery, batteryVoltage, valveStates, motorState, location, secret } = body;
 
   if (!deviceId) return NextResponse.json({ error: "deviceId required" }, { status: 400 });
 
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest) {
     await db.ref().update(updates);
   }
 
+  if (typeof motorState === "boolean") {
+    await db.ref(`devices/${deviceId}/motor`).update({
+      hardwareState: motorState,
+      lastConfirmed: now,
+    });
+  }
+  
   // Write GPS location
   if (location && typeof location === "string" && location.includes(",")) {
     const [lat, lng] = location.split(",").map(Number);
