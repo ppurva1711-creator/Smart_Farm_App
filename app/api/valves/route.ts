@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const response: Record<string, boolean> = {};
   for (const [id, data] of Object.entries(valves as Record<string, Record<string, unknown>>)) {
-    response[id] = !!(data.desiredState);
+    response[id] = !!(data && (data as any).desiredState);
   }
 
   return NextResponse.json(response);
@@ -75,17 +75,13 @@ export async function POST(req: NextRequest) {
 
 // Hardware confirms action
 export async function PUT(req: NextRequest) {
-  let body: { deviceId: string; valveId: string; actualState: boolean; secret: string };
-  try { body = await req.json(); }
-  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-
-  const { deviceId, valveId, actualState, secret } = body;
-  if (SECRET && secret !== SECRET) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const db = getAdminDb();
+  // ADD THIS inside POST (optional fallback)
+if (body.actualState !== undefined) {
   await db.ref(`devices/${deviceId}/valves/${valveId}`).update({
-    hardwareState: actualState, lastConfirmed: Date.now(),
+    hardwareState: body.actualState,
+    lastConfirmed: Date.now(),
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, confirmed: true });
+}
 }
