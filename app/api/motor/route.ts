@@ -56,89 +56,98 @@ export async function GET(req: NextRequest) {
 
   let finalState = !!motor.desiredState;
 
-  // ✅ APPLY SCHEDULING
   if (schedule.enabled && schedule.start && schedule.end) {
     finalState = isWithinTimeRange(schedule.start, schedule.end, now);
   }
 
-  // ❌ BLOCK BY LOAD SHEDDING
   if (isBlockedByLoadShedding(load.ranges || [], now)) {
     finalState = false;
   }
+
+  console.log("GET → Device:", deviceId, "Final State:", finalState);
 
   return NextResponse.json({
     desiredState: finalState,
     hardwareState: motor.hardwareState ?? null,
     lastConfirmed: motor.lastConfirmed ?? null,
   });
-} 
+}
 
 // =====================================================
-// POST → App sets desired state
+// POST → App sets desired state (TEST + REAL)
 // =====================================================
 export async function POST(req: NextRequest) {
-  let body: { deviceId: string; desiredState: boolean };
-
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const body = await req.json();
+
+    let deviceId = body.deviceId || "farm_001";
+    let desiredState: boolean;
+
+    // 🔥 SUPPORT BOTH FORMATS
+    if (typeof body.desiredState === "boolean") {
+      desiredState = body.desiredState;
+    } else if (body.state) {
+      desiredState = body.state === "ON";
+    } else {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    }
+
+    console.log("🔥 MOTOR REQUEST RECEIVED:", desiredState ? "ON" : "OFF");
+
+    const db = getAdminDb();
+
+    await db.ref(`devices/${deviceId}/motor`).update({
+      desiredState,
+      desiredAt: Date.now(),
+    });
+
+    console.log("✅ DATABASE UPDATED");
+
+    return NextResponse.json({
+      ok: true,
+      desiredState,
+      message: desiredState ? "Motor ON requested" : "Motor OFF requested",
+    });
+
+  } catch (err) {
+    console.error("❌ POST ERROR:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  const { deviceId, desiredState } = body;
-
-  if (!deviceId || typeof desiredState !== "boolean") {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
-
-  const db = getAdminDb();
-  const now = Date.now();
-
-  await db.ref(`devices/${deviceId}/motor`).update({
-    desiredState,
-    desiredAt: now,
-  });
-
-  return NextResponse.json({
-    ok: true,
-    desiredState,
-    message: desiredState ? "Motor ON requested" : "Motor OFF requested",
-  });
 }
 
 // =====================================================
 // PUT → Hardware confirms actual state
 // =====================================================
 export async function PUT(req: NextRequest) {
-  let body: { deviceId: string; actualState: boolean; secret: string };
-
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    const body = await req.json();
+
+    const { deviceId, actualState, secret } = body;
+
+    if (!deviceId || typeof actualState !== "boolean") {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    if (SECRET && secret !== SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const db = getAdminDb();
+
+    await db.ref(`devices/${deviceId}/motor`).update({
+      hardwareState: actualState,
+      lastConfirmed: Date.now(),
+    });
+
+    console.log("🔁 HARDWARE CONFIRMED:", actualState ? "ON" : "OFF");
+
+    return NextResponse.json({
+      ok: true,
+      confirmed: actualState,
+    });
+
+  } catch (err) {
+    console.error("❌ PUT ERROR:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  const { deviceId, actualState, secret } = body;
-
-  if (!deviceId || typeof actualState !== "boolean") {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
-
-  if (SECRET && secret !== SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const db = getAdminDb();
-  const now = Date.now();
-
-  await db.ref(`devices/${deviceId}/motor`).update({
-    hardwareState: actualState,
-    lastConfirmed: now,
-  });
-
-  return NextResponse.json({
-    ok: true,
-    confirmed: actualState,
-    timestamp: now,
-  });
 }

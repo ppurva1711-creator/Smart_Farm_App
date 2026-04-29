@@ -68,11 +68,18 @@ export function DashboardScreen() {
 
     // Pump state (valve1 = your pump)
     const vRef = ref(db, `devices/${deviceId}/valves/valve1`);
-    refs.push(vRef);
-    onValue(vRef, snap => {
-      const d = snap.val();
-      if (d) setPumpState(!!d.desiredState);
-    });
+onValue(vRef, snap => {
+  const d = snap.val();
+
+  if (d) {
+    // 🔥 Prefer hardwareState if ESP writes it
+    if (d.hardwareState !== undefined && d.hardwareState !== null) {
+      setPumpState(!!d.hardwareState);
+    } else {
+      setPumpState(!!d.desiredState);
+    }
+  }
+});
 
     // Water usage today
     const wRef = ref(db, `devices/${deviceId}/waterUsage/daily/${today}`);
@@ -102,43 +109,32 @@ export function DashboardScreen() {
   }, [uid]);
 
   // ── Toggle pump ON/OFF ──────────────────────────────────────
-  const togglePump = async (newState: boolean) => {
-    if (!deviceId || toggling) return;
-    setToggling(true);
-    try {
-      const db  = getClientDb();
-      const now = Date.now();
-      // Write to Firebase — ESP8266 reads this every 5 seconds
-      await update(ref(db, `devices/${deviceId}/valves/valve1`), {
-        desiredState: newState,
-        desiredAt:    now,
-        ...(newState ? { openedAt: now, closedAt: null } : { closedAt: now }),
-      });
+const togglePump = async (newState: boolean) => {
+  if (!deviceId || toggling) return;
 
-      // Also update water usage when turning OFF
-      if (!newState) {
-        const valveSnap = await (await import('firebase/database')).get(ref(db, `devices/${deviceId}/valves/valve1`));
-        const valve     = valveSnap.val() ?? {};
-        if (valve.openedAt) {
-          const durationMin = (now - valve.openedAt) / 60000;
-          const litres      = Math.round(durationMin * 10); // 10L/min default
-          const dateKey     = new Date(now).toISOString().slice(0, 10);
-          const sumRef      = ref(db, `devices/${deviceId}/waterUsage/daily/${dateKey}`);
-          const sumSnap     = await (await import('firebase/database')).get(sumRef);
-          const sum         = sumSnap.val() ?? { totalLitres:0 };
-          const tank        = 2000;
-          const newTotal    = (sum.totalLitres ?? 0) + litres;
-          await (await import('firebase/database')).set(sumRef, {
-            date: dateKey, totalLitres: newTotal, tankCapacityLitres: tank,
-            ratioPercent: Math.min(100, Math.round((newTotal/tank)*100)),
-            byValve: { valve1: newTotal },
-          });
-        }
-      }
-    } catch (e) { console.error(e); }
-    finally { setTimeout(() => setToggling(false), 1000); }
-  };
+  setToggling(true);
 
+  try {
+    const db = getClientDb();
+    const now = Date.now();
+
+    // 🔥 FULL WRITE (IMPORTANT FOR ESP DETECTION)
+    await set(ref(db, `devices/${deviceId}/valves/valve1`), {
+      desiredState: newState,
+      hardwareState: null, // ESP will update this
+      desiredAt: now,
+      lastCommand: newState ? "ON" : "OFF",
+      updatedAt: now
+    });
+
+    console.log("🔥 Pump command sent:", newState);
+
+  } catch (e) {
+    console.error("❌ Pump error:", e);
+  }
+
+  setTimeout(() => setToggling(false), 1000);
+};
   // ── Request location ────────────────────────────────────────
   const requestLocation = async () => {
     if (!deviceId) return;

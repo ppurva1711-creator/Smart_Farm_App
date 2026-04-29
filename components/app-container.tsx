@@ -79,6 +79,31 @@ function AppContainerContent() {
     }
   };
 
+  const controlMotor = async (state: boolean) => {
+  console.log("MOTOR CLICK:", state ? "ON" : "OFF");
+
+  try {
+    const deviceId = localStorage.getItem("sf_device_id");
+
+    const res = await fetch("/api/motor", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        deviceId,
+        desiredState: state
+      })
+    });
+
+    const data = await res.json();
+    console.log("API RESPONSE:", data);
+
+  } catch (err) {
+    console.error("MOTOR ERROR:", err);
+  }
+};
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       <div className="flex-1 overflow-y-auto">

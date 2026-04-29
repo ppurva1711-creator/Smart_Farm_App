@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "../../../lib/firebase-admin";
 
+// app/api/sensor-data/route.ts
+
+ 
+
 export async function POST(req: NextRequest) {
   let body: {
     deviceId: string;
