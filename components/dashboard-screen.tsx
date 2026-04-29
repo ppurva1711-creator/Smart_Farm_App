@@ -1,6 +1,7 @@
 "use client";
 // components/dashboard-screen.tsx
 // Adapted for 1-pump system (valve1 = your pump relay)
+import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Droplet, Thermometer, Wind, Zap, Battery, MapPin, Wifi, WifiOff, Power } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ const P: Record<string, Record<string, string>> = {
 };
 function p(key: string, lang: string): string { return P[key]?.[lang] ?? P[key]?.en ?? key; }
 
+
 export function DashboardScreen() {
   const { language } = useLanguage();
   const deviceId = typeof window !== 'undefined' ? localStorage.getItem('sf_device_id') : null;
@@ -40,6 +42,12 @@ export function DashboardScreen() {
   const [connected,  setConnected]  = useState(false);
   const [userName,   setUserName]   = useState("Farmer");
   const [toggling,   setToggling]   = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [fromTime, setFromTime] = useState("");
+  const [toTime, setToTime] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [savedSchedule, setSavedSchedule] = useState<{from:string,to:string}|null>(null);
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -177,6 +185,38 @@ export function DashboardScreen() {
     );
   }
 
+const saveSchedule = async () => {
+  if (!deviceId || !fromTime || !toTime) return;
+
+  setSavingSchedule(true);
+
+  try {
+    const db = getClientDb();
+
+    await set(ref(db, `devices/${deviceId}/schedule`), {
+      from: fromTime,
+      to: toTime,
+      active: true,
+      createdAt: Date.now()
+    });
+
+    // ✅ Save locally for dashboard display
+    setSavedSchedule({ from: fromTime, to: toTime });
+
+    // ✅ Show popup
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+
+    setShowSchedule(false);
+    setFromTime("");
+    setToTime("");
+
+  } catch (err) {
+    console.error("Schedule error:", err);
+  }
+
+  setSavingSchedule(false);
+};
   return (
     <div className="bg-[#F4F8F4] min-h-screen pb-24">
       {/* Header */}
@@ -208,6 +248,27 @@ export function DashboardScreen() {
         )}
       </div>
 
+{/* ── SCHEDULE BUTTON (NEW) ── */}
+<div className="bg-white rounded-2xl p-4 shadow-sm">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <div className="bg-purple-100 rounded-xl p-3">
+        <Clock className="w-6 h-6 text-purple-600" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-[#263238]">Schedule Pump</p>
+        <p className="text-xs text-gray-500">Set automatic timing</p>
+      </div>
+    </div>
+
+    <button
+      onClick={() => setShowSchedule(true)}
+      className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm"
+    >
+      Set Time
+    </button>
+  </div>
+</div>
       {powerCut && (
         <div className="mx-4 mt-4 bg-[#E53935] rounded-2xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-6 h-6 text-white flex-shrink-0 mt-0.5" />
@@ -311,7 +372,53 @@ export function DashboardScreen() {
             {water.totalLitres}L / {water.tankCapacityLitres}L capacity ({water.ratioPercent}% used)
           </p>
         </div>
+{/* ── SCHEDULE MODAL (NEW) ── */}
+{showSchedule && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl p-6 w-[90%] max-w-md">
 
+      <h2 className="text-lg font-bold mb-4">Schedule Pump</h2>
+
+      <div className="mb-3">
+        <label className="text-sm text-gray-600">From Time</label>
+        <input
+          type="time"
+          value={fromTime}
+          onChange={(e) => setFromTime(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 mt-1"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="text-sm text-gray-600">To Time</label>
+        <input
+          type="time"
+          value={toTime}
+          onChange={(e) => setToTime(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 mt-1"
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={saveSchedule}
+          disabled={savingSchedule}
+          className="flex-1 bg-purple-600 text-white py-2 rounded-lg"
+        >
+          {savingSchedule ? "Saving..." : "Save"}
+        </button>
+
+        <button
+          onClick={() => setShowSchedule(false)}
+          className="flex-1 bg-gray-200 py-2 rounded-lg"
+        >
+          Cancel
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
         {/* ── Location ── */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
@@ -339,6 +446,15 @@ export function DashboardScreen() {
         </div>
 
       </div>
+      {savedSchedule && (
+  <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-200">
+    <p className="text-sm text-gray-500">Scheduled Timing</p>
+    <p className="text-lg font-bold text-purple-700">
+      ⏰ {savedSchedule.from} → {savedSchedule.to}
+    </p>
+  </div>
+)}
     </div>
+    
   );
 }
