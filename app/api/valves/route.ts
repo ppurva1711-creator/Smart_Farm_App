@@ -74,14 +74,25 @@ export async function POST(req: NextRequest) {
 }
 
 // Hardware confirms action
+// Hardware confirms action — PUT handler (line 77 onwards)
+// Hardware confirms action
 export async function PUT(req: NextRequest) {
-  // ADD THIS inside POST (optional fallback)
-if (body.actualState !== undefined) {
+  let body: { deviceId: string; valveId: string; actualState: boolean };
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
+  const { deviceId, valveId, actualState } = body;
+
+  if (!deviceId || !valveId || typeof actualState !== "boolean") {
+    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  const db = getAdminDb();  // ← was missing, caused "Cannot find name 'db'"
+
   await db.ref(`devices/${deviceId}/valves/${valveId}`).update({
-    hardwareState: body.actualState,
+    hardwareState: actualState,
     lastConfirmed: Date.now(),
   });
 
   return NextResponse.json({ ok: true, confirmed: true });
-}
 }
