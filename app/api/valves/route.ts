@@ -37,58 +37,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const db   = getAdminDb();
-  const now  = Date.now();
-  const r    = db.ref(`devices/${deviceId}/valves/${valveId}`);
-  const snap = await r.once("value");
-  const curr = snap.val() ?? {};
+  const db  = getAdminDb();
+  const now = Date.now();
+  const r   = db.ref(`devices/${deviceId}/valves/${valveId}`);
 
-  await r.update({ desiredState, desiredAt: now });
-
-  // Water usage tracking
-  if (desiredState && !curr.openedAt) {
-    await r.update({ openedAt: now, closedAt: null });
-  } else if (!desiredState && curr.openedAt) {
-    const openedAt    = curr.openedAt as number;
-    const durationMin = (now - openedAt) / 60000;
-    const flowRate    = (curr.flowRateLPM as number) ?? 10;
-    const litres      = Math.round(durationMin * flowRate);
-    const dateKey     = new Date(now).toISOString().slice(0, 10);
-    await r.update({ closedAt: now, openedAt: null });
-
-    const sumRef  = db.ref(`devices/${deviceId}/waterUsage/daily/${dateKey}`);
-    const sumSnap = await sumRef.once("value");
-    const sum     = sumSnap.val() ?? { totalLitres:0, byValve:{} };
-    const tankSnap = await db.ref(`devices/${deviceId}/config/tankCapacityLitres`).once("value");
-    const tank    = tankSnap.val() ?? 2000;
-    const newTotal = (sum.totalLitres ?? 0) + litres;
-
-    await sumRef.set({
-      date: dateKey, totalLitres: newTotal, tankCapacityLitres: tank,
-      ratioPercent: Math.min(100, Math.round((newTotal/tank)*100)),
-      byValve: { ...sum.byValve, [valveId]: (sum.byValve?.[valveId] ?? 0) + litres },
+  // Just write desired state + timestamps
+  // Water usage is now handled ONLY by sensor-data/route.ts (real flow sensor)
+  if (desiredState) {
+    await r.update({
+      desiredState,
+      desiredAt:  now,
+      openedAt:   now,
+      closedAt:   null,
+      lastCommand: "ON",
+    });
+  } else {
+    await r.update({
+      desiredState,
+      desiredAt:  now,
+      closedAt:   now,
+      lastCommand: "OFF",
     });
   }
 
   return NextResponse.json({ ok: true, valveId, desiredState, queuedAt: now });
 }
 
-// Hardware confirms action
-// Hardware confirms action — PUT handler (line 77 onwards)
-// Hardware confirms action
+// Hardware confirms actual state
 export async function PUT(req: NextRequest) {
   let body: { deviceId: string; valveId: string; actualState: boolean };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { deviceId, valveId, actualState } = body;
-
   if (!deviceId || !valveId || typeof actualState !== "boolean") {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const db = getAdminDb();  // ← was missing, caused "Cannot find name 'db'"
-
+  const db = getAdminDb();
   await db.ref(`devices/${deviceId}/valves/${valveId}`).update({
     hardwareState: actualState,
     lastConfirmed: Date.now(),

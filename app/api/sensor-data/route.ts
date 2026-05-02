@@ -2,10 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "../../../lib/firebase-admin";
 
-// app/api/sensor-data/route.ts
-
- 
-
 export async function POST(req: NextRequest) {
   let body: {
     deviceId: string;
@@ -18,17 +14,24 @@ export async function POST(req: NextRequest) {
     motorState?: boolean;
     location?: string;
     secret: string;
+    // ── NEW ──────────────────────────────
+    flowLitres?: number;        // total litres measured this session by flow sensor
+    flowRateLPM?: number;       // current flow rate in L/min
+    activeValveId?: string;     // which valve the flow sensor is measuring e.g. "valve1"
   };
 
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { deviceId, temperature, humidity, soilMoisture,
-          battery, batteryVoltage, valveStates, motorState, location, secret } = body;
+  const {
+    deviceId, temperature, humidity, soilMoisture,
+    battery, batteryVoltage, valveStates, motorState,
+    location, secret,
+    flowLitres, flowRateLPM, activeValveId,   // NEW
+  } = body;
 
   if (!deviceId) return NextResponse.json({ error: "deviceId required" }, { status: 400 });
 
-  // Simple secret check
   const expectedSecret = process.env.HARDWARE_SHARED_SECRET;
   if (expectedSecret && secret !== expectedSecret && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -37,17 +40,18 @@ export async function POST(req: NextRequest) {
   const db  = getAdminDb();
   const now = Date.now();
 
-  // Write sensor snapshot
+  // ── Sensor snapshot (added flowRateLPM) ─────────────────────
   await db.ref(`devices/${deviceId}/sensors`).set({
     temperature:    temperature    ?? null,
     humidity:       humidity       ?? null,
     soilMoisture:   soilMoisture   ?? null,
     battery:        battery        ?? null,
     batteryVoltage: batteryVoltage ?? null,
+    flowRateLPM:    flowRateLPM    ?? null,   // live L/min shown on dashboard
     timestamp:      now,
   });
 
-  // Write valve hardware states (confirmed by hardware)
+  // ── Valve hardware states ────────────────────────────────────
   if (valveStates && typeof valveStates === "object") {
     const updates: Record<string, unknown> = {};
     for (const [valveId, isOpen] of Object.entries(valveStates)) {
@@ -63,8 +67,8 @@ export async function POST(req: NextRequest) {
       lastConfirmed: now,
     });
   }
-  
-  // Write GPS location
+
+  // ── GPS location ─────────────────────────────────────────────
   if (location && typeof location === "string" && location.includes(",")) {
     const [lat, lng] = location.split(",").map(Number);
     if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
@@ -75,7 +79,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Battery cycle tracking
+  // ── NEW: Real flow sensor water usage ────────────────────────
+  if (typeof flowLitres === "number" && flowLitres > 0) {
+    const dateKey  = new Date(now).toISOString().slice(0, 10);  // "2026-05-01"
+    const valveKey = activeValveId ?? "valve1";
+    const sumRef   = db.ref(`devices/${deviceId}/waterUsage/daily/${dateKey}`);
+    const sumSnap  = await sumRef.once("value");
+    const existing = sumSnap.val() ?? { totalLitres: 0, byValve: {} };
+
+    const tankSnap = await db.ref(`devices/${deviceId}/config/tankCapacityLitres`).once("value");
+    const tank     = tankSnap.val() ?? 2000;
+
+    // Add new litres on top of what's already recorded today
+    const newTotal = (existing.totalLitres ?? 0) + flowLitres;
+    const byValve  = existing.byValve ?? {};
+    byValve[valveKey] = (byValve[valveKey] ?? 0) + flowLitres;
+
+    await sumRef.set({
+      date:               dateKey,
+      totalLitres:        Math.round(newTotal * 10) / 10,   // 1 decimal
+      tankCapacityLitres: tank,
+      ratioPercent:       Math.min(100, Math.round((newTotal / tank) * 100)),
+      byValve,
+      lastUpdated:        now,
+    });
+
+    // Also write live flow to valve node so dashboard can show it
+    await db.ref(`devices/${deviceId}/valves/${valveKey}`).update({
+      flowRateLPM:   flowRateLPM ?? null,
+      totalLitres:   Math.round(newTotal * 10) / 10,
+      lastFlowAt:    now,
+    });
+  }
+
+  // ── Battery cycle tracking (unchanged) ───────────────────────
   try {
     const cycleRef  = db.ref(`devices/${deviceId}/battery/cycleTracking`);
     const cycleSnap = await cycleRef.once("value");
@@ -100,10 +137,12 @@ export async function POST(req: NextRequest) {
     await cycleRef.update(updates);
   } catch { /* non-critical */ }
 
-  // Save to history (1-minute resolution)
+  // ── History snapshot ─────────────────────────────────────────
   const key = new Date(now).toISOString().slice(0, 16).replace(":", "-");
   await db.ref(`devices/${deviceId}/history/sensors/${key}`).set({
-    temperature, battery, batteryVoltage, timestamp: now,
+    temperature, battery, batteryVoltage,
+    flowRateLPM: flowRateLPM ?? null,
+    timestamp: now,
   });
 
   return NextResponse.json({ ok: true, receivedAt: now });
