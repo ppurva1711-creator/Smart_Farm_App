@@ -1,0 +1,5 @@
+[phases.build]
+cmds = ["npm run build"]
+
+[variables]
+NODE_VERSION = "20"
