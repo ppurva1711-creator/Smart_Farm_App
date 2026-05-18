@@ -80,38 +80,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── NEW: Real flow sensor water usage ────────────────────────
-  if (typeof flowLitres === "number" && flowLitres > 0) {
-    const dateKey  = new Date(now).toISOString().slice(0, 10);  // "2026-05-01"
-    const valveKey = activeValveId ?? "valve1";
-    const sumRef   = db.ref(`devices/${deviceId}/waterUsage/daily/${dateKey}`);
-    const sumSnap  = await sumRef.once("value");
-    const existing = sumSnap.val() ?? { totalLitres: 0, byValve: {} };
+ if (typeof flowLitres === "number") {
 
-    const tankSnap = await db.ref(`devices/${deviceId}/config/tankCapacityLitres`).once("value");
-    const tank     = tankSnap.val() ?? 2000;
+  await db.ref(`devices/${deviceId}/waterUsage`).update({
+    currentFlowRate: flowRateLPM ?? 0,
+    totalLitres: Math.round(flowLitres * 10) / 10,
+    updatedAt: now,
+  });
 
-    // Add new litres on top of what's already recorded today
-    const newTotal = (existing.totalLitres ?? 0) + flowLitres;
-    const byValve  = existing.byValve ?? {};
-    byValve[valveKey] = (byValve[valveKey] ?? 0) + flowLitres;
-
-    await sumRef.set({
-      date:               dateKey,
-      totalLitres:        Math.round(newTotal * 10) / 10,   // 1 decimal
-      tankCapacityLitres: tank,
-      ratioPercent:       Math.min(100, Math.round((newTotal / tank) * 100)),
-      byValve,
-      lastUpdated:        now,
-    });
-
-    // Also write live flow to valve node so dashboard can show it
-    await db.ref(`devices/${deviceId}/valves/${valveKey}`).update({
-      flowRateLPM:   flowRateLPM ?? null,
-      totalLitres:   Math.round(newTotal * 10) / 10,
-      lastFlowAt:    now,
-    });
-  }
-
+}
   // ── Battery cycle tracking (unchanged) ───────────────────────
   try {
     const cycleRef  = db.ref(`devices/${deviceId}/battery/cycleTracking`);
