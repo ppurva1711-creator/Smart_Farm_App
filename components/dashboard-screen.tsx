@@ -82,12 +82,25 @@ onValue(vRef, snap => {
 });
 
     // Water usage today
-    const wRef = ref(db, `devices/${deviceId}/waterUsage/daily/${today}`);
-    refs.push(wRef);
-    onValue(wRef, snap => {
-      const d = snap.val();
-      if (d) setWater({ totalLitres:d.totalLitres??0, tankCapacityLitres:d.tankCapacityLitres??2000, ratioPercent:d.ratioPercent??0 });
+    // Water usage
+const wRef = ref(db, `devices/${deviceId}/waterUsage`);
+refs.push(wRef);
+
+onValue(wRef, snap => {
+  const d = snap.val();
+
+  if (d) {
+
+    const total = d.totalLitres ?? 0;
+    const tank  = 2000;
+
+    setWater({
+      totalLitres: total,
+      tankCapacityLitres: tank,
+      ratioPercent: Math.min(100, Math.round((total / tank) * 100))
     });
+  }
+});
 
     // Location
     const lRef = ref(db, `devices/${deviceId}/location`);
