@@ -84,22 +84,20 @@ onValue(vRef, snap => {
     // Water usage today
     // Water usage
 const wRef = ref(db, `devices/${deviceId}/waterUsage`);
+
 refs.push(wRef);
 
 onValue(wRef, snap => {
-  const d = snap.val();
+  const d = snap.val() ?? {};
 
-  if (d) {
+  const total = d.totalLitres ?? 0;
+  const tank  = 2000;
 
-    const total = d.totalLitres ?? 0;
-    const tank  = 2000;
-
-    setWater({
-      totalLitres: total,
-      tankCapacityLitres: tank,
-      ratioPercent: Math.min(100, Math.round((total / tank) * 100))
-    });
-  }
+  setWater({
+    totalLitres: total,
+    tankCapacityLitres: tank,
+    ratioPercent: Math.min(100, Math.round((total / tank) * 100))
+  });
 });
 
     // Location
@@ -373,7 +371,9 @@ const saveSchedule = async () => {
               {pumpState ? '🔵 Flowing' : '⚫ Stopped'}
             </Badge>
           </div>
-          <p className="text-3xl font-bold text-[#263238]">{water.totalLitres}L</p>
+          <p className="text-3xl font-bold text-[#263238]">
+  {water.totalLitres.toFixed(1)}L
+</p>
           <div className="w-full bg-[#E8EFE8] rounded-full h-2 mt-3">
             <div className="bg-[#1565C0] h-2 rounded-full" style={{ width:`${Math.min(water.ratioPercent,100)}%` }} />
           </div>
