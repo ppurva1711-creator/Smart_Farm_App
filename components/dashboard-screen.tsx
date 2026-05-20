@@ -228,17 +228,6 @@ const saveSchedule = async () => {
 
     const db = getClientDb();
 
-   const saveSchedule = async () => {
-
-  if (!deviceId || !fromTime || !toTime)
-    return;
-
-  setSavingSchedule(true);
-
-  try {
-
-    const db = getClientDb();
-
     // ✅ CORRECT PATH
     const schedulesRef =
       ref(db, `devices/${deviceId}/schedules`);
@@ -559,7 +548,7 @@ const saveSchedule = async () => {
 
       )}
 
-      </div>
-
+            </div>
     </div>
-    
+  );
+}
