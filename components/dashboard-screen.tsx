@@ -130,7 +130,7 @@ onValue(wRef, snap => {
     refs.push(lRef);
     onValue(lRef, snap => {
       const d = snap.val();
-      if (d?.lat && d?.lng) { setLocation({lat:d.lat, lng:d.lng}); setLocPending(!!d.pending); }
+      if (d?.lat !== undefined && d?.lng !== undefined) { setLocation({lat:d.lat, lng:d.lng}); setLocPending(!!d.pending); }
     });
 
     return () => refs.forEach(r => off(r));
@@ -228,15 +228,28 @@ const saveSchedule = async () => {
 
     const db = getClientDb();
 
-    cconst scheduleRef =
-  ref(db, `devices/${deviceId}/schedule`);
+   const saveSchedule = async () => {
 
-await set(scheduleRef, {
-  enabled: true,
-  start: fromTime,
-  end: toTime,
-  createdAt: Date.now()
-});
+  if (!deviceId || !fromTime || !toTime)
+    return;
+
+  setSavingSchedule(true);
+
+  try {
+
+    const db = getClientDb();
+
+    // ✅ CORRECT PATH
+    const schedulesRef =
+      ref(db, `devices/${deviceId}/schedules`);
+
+    // ✅ CREATE NEW SCHEDULE
+    await push(schedulesRef, {
+      enabled: true,
+      start: fromTime,
+      end: toTime,
+      createdAt: Date.now()
+    });
 
     setShowToast(true);
 
@@ -549,3 +562,4 @@ await set(scheduleRef, {
       </div>
 
     </div>
+    
