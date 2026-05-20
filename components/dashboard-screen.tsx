@@ -9,7 +9,7 @@ import { useLanguage } from '@/app/context/LanguageContext';
 import { t } from '@/lib/i18n';
 import { LanguageSelector } from './language-selector';
 import { getClientDb } from '@/lib/firebase';
-import { ref, onValue, off, set, update } from 'firebase/database';
+import { ref, onValue, off, set, update, push, remove } from 'firebase/database';
 
 // Translations for pump-specific labels
 const P: Record<string, Record<string, string>> = {
@@ -46,7 +46,7 @@ export function DashboardScreen() {
   const [fromTime, setFromTime] = useState("");
   const [toTime, setToTime] = useState("");
   const [savingSchedule, setSavingSchedule] = useState(false);
-  const [savedSchedule, setSavedSchedule] = useState<{from:string,to:string}|null>(null);
+  const [schedules, setSchedules] = useState<any[]>([]);
   const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
@@ -57,6 +57,31 @@ export function DashboardScreen() {
 
     // Sensors (temperature, humidity, soilMoisture, battery)
     const sRef = ref(db, `devices/${deviceId}/sensors`);
+    // ── Schedules ─────────────────────────────
+const schRef = ref(db, `devices/${deviceId}/schedules`);
+
+refs.push(schRef);
+
+onValue(schRef, (snap) => {
+
+  const data = snap.val();
+
+  if (!data) {
+    setSchedules([]);
+    return;
+  }
+
+  const arr = Object.entries(data).map(([id, value]: any) => ({
+    id,
+    ...value
+  }));
+
+  // newest first
+  arr.reverse();
+
+  setSchedules(arr);
+});
+
     refs.push(sRef);
     onValue(sRef, snap => {
       const d = snap.val() ?? {};
@@ -193,37 +218,46 @@ const togglePump = async (newState: boolean) => {
   }
 
 const saveSchedule = async () => {
-  if (!deviceId || !fromTime || !toTime) return;
+
+  if (!deviceId || !fromTime || !toTime)
+    return;
 
   setSavingSchedule(true);
 
   try {
+
     const db = getClientDb();
 
-    await set(ref(db, `devices/${deviceId}/schedule`), {
-      from: fromTime,
-      to: toTime,
-      active: true,
-      createdAt: Date.now()
-    });
+    cconst scheduleRef =
+  ref(db, `devices/${deviceId}/schedule`);
 
-    // ✅ Save locally for dashboard display
-    setSavedSchedule({ from: fromTime, to: toTime });
+await set(scheduleRef, {
+  enabled: true,
+  start: fromTime,
+  end: toTime,
+  createdAt: Date.now()
+});
 
-    // ✅ Show popup
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000);
 
     setShowSchedule(false);
+
     setFromTime("");
     setToTime("");
 
   } catch (err) {
+
     console.error("Schedule error:", err);
+
   }
 
   setSavingSchedule(false);
 };
+
   return (
     <div className="bg-[#F4F8F4] min-h-screen pb-24">
       {/* Header */}
@@ -454,16 +488,64 @@ const saveSchedule = async () => {
           )}
         </div>
 
+            {/* ── ALL SCHEDULES ── */}
+      {schedules.length > 0 && (
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-200">
+
+          <p className="text-sm text-gray-500 mb-3">
+            Scheduled Timings
+          </p>
+
+          <div className="space-y-3">
+
+            {schedules.map((s) => (
+
+              <div
+                key={s.id}
+                className="bg-purple-50 rounded-xl px-4 py-3 flex items-center justify-between"
+              >
+
+                <div>
+
+                  <p className="text-lg font-bold text-purple-700">
+                    ⏰ {s.start} → {s.end}
+                  </p>
+
+                  <p className="text-xs text-gray-500">
+                    {s.enabled ? "Enabled" : "Disabled"}
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={async () => {
+
+                    const db = getClientDb();
+
+                    await remove(
+                      ref(
+                        db,
+                        `devices/${deviceId}/schedules/${s.id}`
+                      )
+                    );
+
+                  }}
+                  className="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-sm"
+                >
+                  Delete
+                </button>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </div>
+
+      )}
+
       </div>
-      {savedSchedule && (
-  <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-200">
-    <p className="text-sm text-gray-500">Scheduled Timing</p>
-    <p className="text-lg font-bold text-purple-700">
-      ⏰ {savedSchedule.from} → {savedSchedule.to}
-    </p>
-  </div>
-)}
+
     </div>
-    
-  );
-}
