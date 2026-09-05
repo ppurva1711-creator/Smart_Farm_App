@@ -62,8 +62,8 @@ The app connects to physical Arduino/SIM800L hardware installed in the field via
                      │ HTTP GET every 5s (valve polling)
 ┌────────────────────▼────────────────────────────────────┐
 │              HARDWARE (Field Device)                    │
-│  Arduino Mega + SIM800L GSM + DHT22 + INA219           │
-│  4x Relay (Valve Solenoids) + GPS                      │
+│  ESP32 + SIM7670c GSM + DHT22 + INA219           │
+│  2x Relay (Valve Solenoids) + GPS                      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -132,7 +132,7 @@ The app connects to physical Arduino/SIM800L hardware installed in the field via
 | Hardware Comm | HTTP over GPRS (SIM800L) |
 | SMS / Location | Twilio (GSM location request) |
 | Hosting | Vercel |
-| Hardware | Arduino Mega, SIM800L, DHT22, INA219 |
+| Hardware | ESP32, SIM7670c, DHT22, INA219 |
 
 ---
 
@@ -174,7 +174,7 @@ Smart_Farm_App/
 ├── hooks/
 │   └── useRealtimeDevice.ts       # Firebase realtime hooks
 └── hardware-firmware/
-    └── smart_farm.ino             # Arduino firmware for SIM800L
+    └── smart_farm.ino             # ESP32 firmware for SIM7670c
 ```
 
 ---
@@ -253,11 +253,11 @@ vercel deploy --prod
 ### Components Required
 | Component | Purpose |
 |-----------|---------|
-| Arduino Mega 2560 | Main controller |
-| SIM800L GSM Module | Internet + SMS |
+| ESP32 | Main controller |
+| SIM7670c GSM Module | Internet + SMS |
 | DHT22 Sensor | Temperature + Humidity |
 | INA219 Module | Battery voltage/current |
-| 4x Relay Module | Valve solenoid control |
+| 2x Relay Module | Valve solenoid control |
 | 12V Solenoid Valves | Field irrigation |
 | 12V Lead-acid Battery | Power backup |
 | SIM Card (with data) | GPRS connectivity |
@@ -265,14 +265,18 @@ vercel deploy --prod
 ### Wiring
 
 ```
-Arduino Pin 10  → SIM800L TX
-Arduino Pin 11  → SIM800L RX
-Arduino Pin 4   → DHT22 Data
-Arduino Pin 22  → Relay 1 (Valve 1)
-Arduino Pin 24  → Relay 2 (Valve 2)
-Arduino Pin 26  → Relay 3 (Valve 3)
-Arduino Pin 28  → Relay 4 (Valve 4)
-I2C SDA/SCL     → INA219
+ESP32 GPIO 16 → SIM7670c TX
+ESP32 GPIO 17 → SIM7670c RX
+ESP32 GPIO 32 ← GPS TX
+ESP32 GPIO 33 ← GPS RX
+ESP32 GPIO 4  → DHT22 Data
+ESP32 GPIO 26 → Relay 1 (Valve 1)
+ESP32 GPIO 27 → Relay 2 (Valve 2)
+ESP32 GPIO 25 → FLOW SENSOR SIGNAL
+ESP32 GPIO 21 ↔ INA219 SDA
+ESP32 GPIO 22 ↔ INA219 SCL
+ESP32 GPIO 21 ↔ RTC SDA
+ESP32 GPIO 22 ↔ RTC SCL
 ```
 
 ### Firmware Configuration
@@ -287,7 +291,7 @@ const char* SERVER_HOST     = "your-app.vercel.app";
 ```
 
 ### Required Arduino Libraries
-- `ArduinoJson` by Benoit Blanchon
+- `ARDUINOJson` by Benoit Blanchon
 - `DHT sensor library` by Adafruit
 - `Adafruit INA219`
 - `Cryptosuite` by Cathedrow
@@ -316,7 +320,7 @@ const char* SERVER_HOST     = "your-app.vercel.app";
 User taps toggle
     → Firebase: valves/valve1/desiredState = true
     → Hardware polls GET /api/valves every 5s
-    → Arduino opens relay (valve opens physically)
+    → ESP32 opens relay (valve opens physically)
     → Hardware confirms via PUT /api/valves
     → App shows "✓ Hardware confirmed"
 ```
